@@ -1,0 +1,578 @@
+---
+title: "Obtaining Uncertainty Estimates from Neural Networks Using TensorFlow Probability"
+author: "Sigrid Keydana"
+date: 'Predictive Analytics World 2019'
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: theme/rstudio.css
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: '16:9'
+---
+
+class: inverse, middle, center
+
+# Neural networks are awesome ...
+
+
+---
+
+# Deep learning yields excellent results in e.g. 
+
+<br />
+
+- Image recognition (classification, segmentation, object detection)
+
+- Natural language processing (language models, translation, generation)
+
+- Domain modeling (embeddings)
+
+- Entity generation ("fakes"): Faces, text ...
+
+- Tasks involving tabular data (e.g., recommender systems)
+
+- Playing games (deep reinforcement learning)
+
+---
+
+class: inverse, middle, center
+
+# So what are we missing?
+
+---
+
+# Networks output _point estimates_
+
+<br />
+
+
+- A single numeric prediction 
+
+- A single segmentation mask
+
+- A single translation
+
+- A single embedding
+
+<br />
+ 
+But wait ... aren't there probabilities in there, _somewhere_?
+
+---
+# Name that animal
+
+<figure>
+<img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/p1.png"/>
+<figcaption><br />Image: Ben Tubby [CC BY 2.0 (https://creativecommons.org/licenses/by/2.0)]
+https://upload.wikimedia.org/wikipedia/commons/3/30/Falkland_Islands_Penguins_35.jpg</figcaption>
+</figure>
+
+Let's ask the network ...
+
+
+---
+# What network?
+
+... TensorFlow, but from R!
+
+<figure>
+    <img src="dlwr.jpg" style = "float:left;" width= "35%">
+</figure>
+<figure>
+    <img src="r-tf.png" style = "float:right;" width= "45%">
+</figure>
+
+
+---
+# R-TensorFlow
+
+<br /> 
+- [R bindings to TensorFlow](https://tensorflow.rstudio.com/) (subsumes Keras)
+
+- TensorFlow-related infrastructure...
+  - [Dataset preprocessing pipeline](https://github.com/rstudio/tfdatasets)
+  - [TensorFlow datasets](https://github.com/rstudio/tfds)
+  - [tfhub](https://github.com/rstudio/tfhub)
+  - and more ...
+
+- [_r-tensorflow_ ecosystem](https://github.com/r-tensorflow):
+  - Model implementations, e.g. U-Net, WaveNet ... 
+  - User-contributed packages for automation, tuning, ...
+
+- blog: https://blogs.rstudio.com/tensorflow/
+
+---
+# With R-Keras, let's ask a pretrained model...
+
+```{r, eval=FALSE}
+library(tensorflow)
+library(keras)
+
+model <- application_mobilenet_v2()
+probs <- model %>% predict(image)
+imagenet_decode_predictions(probs)
+```
+
+<br />
+
+```
+  class_name class_description        score
+1  n02056570      king_penguin 0.9899597168
+2  n01847000             drake 0.0011793933
+3  n01798484   prairie_chicken 0.0002387235
+4  n02058221         albatross 0.0002117234
+5  n02071294      killer_whale 0.0001432021
+```
+
+---
+# Let's do another one
+
+<figure>
+<img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/p2.png"/>
+<figcaption><br />Image: M. Murphy [Public domain]<br />
+https://upload.wikimedia.org/wikipedia/commons/2/22/RoyalPenguins3.JPG</figcaption>
+</figure>
+
+
+---
+# So what is that?
+
+```{r, eval=FALSE}
+probs <- model %>% predict(image)
+imagenet_decode_predictions(probs)
+```
+
+<br />
+
+```
+  class_name class_description      score
+1  n02051845           pelican 0.24614049
+2  n02009912    American_egret 0.18564136
+3  n02058221         albatross 0.06848499
+4  n02012849             crane 0.04572001
+5  n02009229 little_blue_heron 0.03902744
+```
+<br />
+
+### Hm... what really is that _score_?
+
+---
+# Stepping back: What's a neural network?
+
+
+<img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/playground.png" width = "70%"/>
+
+---
+# Zooming in: Weights and activations
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/perceptron.png" width = "60%">
+    <figcaption>Source: https://en.wikipedia.org/wiki/Perceptron</figcaption>
+</figure>
+
+
+---
+
+# Activation functions in regression
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense(units = 32, activation = "relu", input_shape = 7) %>%
+  # default activation = linear
+  layer_dense(units = 1)
+
+```
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/relu.png" width = "60%">
+    <figcaption><b>ReLU</b> activation</figcaption>
+</figure>
+
+
+---
+
+# Sigmoid activation for binary classification
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense(units = 32, activation = "relu", input_shape = 7) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+```
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/sigmoid.png" width = "60%">
+    <figcaption><b>Sigmoid</b> activation</figcaption>
+</figure>
+
+---
+
+# Softmax activation for multiple classification
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense(units = 32, activation = "relu", input_shape = 7) %>%
+  layer_dense(units = 10, activation = "softmax")
+```
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/softmax_pre.png" style = "float:left;" width= "50%">
+</figure>
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/softmax_post.png" style = "float:right;" width= "50%">
+</figure>
+
+Before and after __softmax__ activation.
+
+---
+
+# So our "probability" is just a maximum likelihood estimate ...
+
+<br />
+
+... how can we make this probabilistic?
+
+---
+class: inverse, middle, center
+
+# Indirect ways: ensembling (model averaging), dropout ...
+
+
+---
+# Dropout uncertainty (Gal & Ghahramani, 2016)<sup>1</sup>
+
+- _dropout_: stochastic removal of units in hidden (or input) layers
+
+- habitually used as a regularization measure during training
+
+- idea: use at test time and average predictions
+
+- mathematically derived to be ["equivalent to Monte Carlo integration over a Gaussian process posterior approximation"](http://mlg.eng.cam.ac.uk/yarin/blog_3d801aa532c1ce.html)
+
+<br />
+
+## Question: How to choose the dropout rate?
+
+
+.footnote[
+[1] Gal and Ghahramani (2016): Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning
+]
+
+---
+# Dropout uncertainty, next level (Kendall & Gal, 2017) <sup>1</sup><sup>2</sup>
+
+<br /> 
+
+- let the network learn the dropout rate
+
+- let the network learn the variance (account for _heteroscedasticity_)
+
+- independently calculate _epistemic_ and _aleatoric_ uncertainty
+
+.footnote[
+[1] Kendall & Gal (2017): What Uncertainties Do We Need in Bayesian Deep Learning for Computer Vision?
+
+[2] Gal, Hron, & Kendall (2017): Concrete Dropout.
+]
+
+---
+# Types of uncertainty: aleatoric vs. epistemic<sup>1</sup>
+
+- 
+
+.footnote[
+[1]
+Hora, S. (1996) Aleatory and epistemic uncertainty in probability elicitation with an example from hazardous waste management.
+]
+
+---
+class: inverse, middle, center
+
+# Or just directly: Bayesian networks!
+
+---
+
+# The idea: Put distributions over the network's weights
+
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/weight_uncertainty.png" width = "120%">
+    <figcaption>Blundell et al. (2015): Weight Uncertainty in Neural Networks</figcaption>
+</figure>
+
+
+---
+# Many great predecessors...
+
+- McKay (1992): A practical Bayesian framework for backprop networks
+
+- Hinton and van Camp (1993): Keeping neural networks simple by minimizing the description length of the weights
+
+- R. Neal (1996): Bayesian learning for neural networks
+
+
+---
+# But gained more momentum rather recently...
+
+- Graves (2011): Practical Variational Inference for Neural Networks
+
+- Kingma et al. (2015): Variational dropout and the local reparameterization trick
+
+- Blundell et al. (2015): Weight uncertainty in neural networks (a.k.a "Bayes by backprop")
+
+
+---
+# Yeah, but how?
+
+<br />
+
+[TensorFlow Probability](https://www.tensorflow.org/probability/) (Python library on top of TensorFlow)
+
+[tfprobability](https://rstudio.github.io/tfprobability/) (R package)
+
+<br />
+
+```{r, eval=FALSE}
+devtools::install_github("rstudio/tfprobability")
+
+library(tfprobability)
+install_tfprobability()
+```
+
+
+---
+# tfprobability (1): Basic building blocks
+
+#### Distributions
+
+```{r, eval=FALSE}
+d <- tfd_binomial(total_count = 7, probs = 0.3)
+d %>% tfd_mean()
+#> tf.Tensor(2.1000001, shape=(), dtype=float32)
+d %>% tfd_variance()
+#> tf.Tensor(1.47, shape=(), dtype=float32)
+d %>% tfd_log_prob(2.3)
+#> tf.Tensor(-1.1914139, shape=(), dtype=float32)
+```
+
+#### Bijectors
+
+```{r, eval=FALSE}
+b <- tfb_affine_scalar(shift = 3.33, scale = 0.5)
+x <- c(100, 1000, 10000)
+b %>% tfb_forward(x)
+#> tf.Tensor([  53.33  503.33 5003.33], shape=(3,), dtype=float32)
+```
+
+
+
+---
+# tfprobability (2): Higher-level modules
+
+<br />
+
+- Keras layers 
+
+- Markov Chain Monte Carlo (Hamiltonian Monte Carlo, NUTS)
+
+- Variational inference
+
+- State space models
+
+- GLMs
+
+---
+class: inverse, middle, center
+
+# How does that help us?
+
+
+---
+# With TFP, neural network layers can be _distributions_
+
+<br />
+A network that has a multivariate normal distribution as output
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense(units = params_size_multivariate_normal_tri_l(d)) %>%
+  layer_multivariate_normal_tri_l(event_size = d)
+
+log_loss <- function (y, model) - (model %>% tfd_log_prob(y))
+
+model %>% compile(optimizer = "adam", loss = log_loss)
+
+model %>% fit(
+  x,
+  y,
+  batch_size = 100,
+  epochs = 1,
+  steps_per_epoch = 10
+)
+```
+
+---
+# More distribution layers
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/distribution_layers.png" width = "100%">
+    <figcaption>Complete list: <a href="https://rstudio.github.io/tfprobability/reference/index.html#section-keras-layers-distribution-layers">Distribution layers</a></figcaption>
+</figure>
+
+---
+# Outputting a distribution: Aleatoric uncertainty
+
+
+Instead of a single unit (of a _dense_ layer), we output a __normal distribution__:
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense(units = 8, activation = "relu") %>%
+  layer_dense(units = 2, activation = "linear") %>%
+  layer_distribution_lambda(function(x)
+    tfd_normal(loc = x[, 1, drop = FALSE],
+               scale = 1e-3 + tf$math$softplus(x[, 2, drop = FALSE])
+               )
+  )
+
+negloglik <- function(y, model) - (model %>% tfd_log_prob(y))
+model %>% compile(
+  optimizer = optimizer_adam(lr = 0.01),
+  loss = negloglik
+)
+model %>% fit(x, y, epochs = 1000)
+
+```
+
+---
+# Aleatoric uncertainty ~ learned spread in the data
+
+```{r, eval=FALSE}
+yhat <- model(tf$constant(x_test))
+mean <- yhat %>% tfd_mean()
+sd <- yhat %>% tfd_stddev()
+```
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/aleatoric.png" width = "80%">
+</figure>
+
+---
+# Placing a distribution over the weights: Epistemic uncertainty
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense_variational(
+    units = 1,
+    make_posterior_fn = posterior_mean_field,
+    make_prior_fn = prior_trainable,
+    kl_weight = 1 / n
+  ) %>%
+  layer_distribution_lambda(
+    function(x) tfd_normal(loc = x, scale = 1)
+    )
+
+negloglik <- function(y, model) - (model %>% tfd_log_prob(y))
+model %>% compile(
+  optimizer = optimizer_adam(lr = 0.1),
+  loss = negloglik
+)
+model %>% fit(x, y, epochs = 1000)
+```
+
+---
+# Epistemic uncertainty ~ model uncertainty
+
+Every prediction uses a different _sample from the weight distributions_!
+
+```{r, eval=FALSE}
+yhats <- purrr::map(1:100, function(x) model(tf$constant(x_test)))
+```
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/epistemic.png" width = "80%">
+</figure>
+
+---
+# Posterior weights are computed using variational inference
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/blei_vi.png" width = "80%">
+    <figcaption>Source: <a href="https://media.nips.cc/Conferences/2016/Slides/6199-Slides.pdf">David Blei, Rajesh Ranganath, Shakir Mohamed: Variational Inference:Foundations and Modern Methods. NIPS 2016 Tutorial·December 5, 2016.</a></figcaption>
+</figure>
+
+---
+# Epistemic and aleatoric uncertainty in one model
+
+```{r, eval=FALSE}
+model <- keras_model_sequential() %>%
+  layer_dense_variational(
+    units = 2,
+  ) %>%
+  layer_distribution_lambda(function(x)
+    tfd_normal(loc = x[, 1, drop = FALSE],
+               scale = 1e-3 + tf$math$softplus(0.01 * x[, 2, drop = FALSE])
+               )
+    )
+
+yhats <- purrr::map(1:100, function(x) model(tf$constant(x_test)))
+means <-
+  purrr::map(yhats, purrr::compose(as.matrix, tfd_mean)) %>% abind::abind()
+sds <-
+  purrr::map(yhats, purrr::compose(as.matrix, tfd_stddev)) %>% abind::abind()
+```
+
+
+---
+# Main challenge now is how to display ...
+
+Each line is one draw from the posterior weights; each line has its own standard deviation.
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/both.png" width = "70%">
+</figure>
+
+More background: https://blogs.rstudio.com/tensorflow/posts/2019-06-05-uncertainty-estimates-tfprobability/
+
+---
+class: inverse, middle, center
+
+
+
+
+# Other ways of modeling uncertainty with TFP
+
+
+---
+# Variational autoencoders: Informative latent codes
+
+<figure>
+    <img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/vae.png" width = "80%">
+    <figcaption>Source: https://lilianweng.github.io/lil-log/2018/08/12/from-autoencoder-to-beta-vae.html</figcaption>
+</figure>
+
+
+---
+# Variational autoencoders with tfprobability
+
+```{r, eval=FALSE}
+encoder_model <- keras_model_sequential() %>%
+  [...] %>%
+  layer_multivariate_normal_tri_l(event_size = encoded_size) %>%
+  # pass in the prior of your choice ...
+  # can use exact KL divergence or Monte Carlo approximation
+  layer_kl_divergence_add_loss([...])
+
+decoder_model <- keras_model_sequential() %>%
+  [...] %>%
+ layer_independent_bernoulli([...])
+
+vae_model <- keras_model(inputs = encoder_model$inputs,
+                         outputs = decoder_model(encoder_model$outputs[1]))
+vae_loss <- function (x, rv_x) - (rv_x %>% tfd_log_prob(x))
+```
+
+
+
