@@ -106,7 +106,7 @@ Let's ask the network ...
   - Model implementations, e.g. U-Net, WaveNet ... 
   - User-contributed packages for automation, tuning, ...
 
-- blog: https://blogs.rstudio.com/tensorflow/
+- Blog: https://blogs.rstudio.com/tensorflow/
 
 ---
 # With R-Keras, let's ask a pretrained model...
@@ -225,6 +225,8 @@ model &lt;- keras_model_sequential() %&gt;%
   layer_dense(units = 10, activation = "softmax")
 ```
 
+&lt;br /&gt;
+
 &lt;figure&gt;
     &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/softmax_pre.png" style = "float:left;" width= "50%"&gt;
 &lt;/figure&gt;
@@ -249,7 +251,9 @@ class: inverse, middle, center
 
 
 ---
-# Dropout uncertainty (Gal &amp; Ghahramani, 2016)&lt;sup&gt;1&lt;/sup&gt;
+# Dropout uncertainty (Gal &amp; Ghahramani, 2016) &lt;sup&gt;1&lt;/sup&gt;
+
+&lt;br /&gt;
 
 - _dropout_: stochastic removal of units in hidden (or input) layers
 
@@ -259,14 +263,16 @@ class: inverse, middle, center
 
 - mathematically derived to be ["equivalent to Monte Carlo integration over a Gaussian process posterior approximation"](http://mlg.eng.cam.ac.uk/yarin/blog_3d801aa532c1ce.html)
 
-&lt;br /&gt;
+.footnote[
+
+[1] Gal and Ghahramani (2016): Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning
+
+]
 
 ## Question: How to choose the dropout rate?
 
 
-.footnote[
-[1] Gal and Ghahramani (2016): Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning
-]
+
 
 ---
 # Dropout uncertainty, next level (Kendall &amp; Gal, 2017) &lt;sup&gt;1&lt;/sup&gt;&lt;sup&gt;2&lt;/sup&gt;
@@ -288,17 +294,67 @@ class: inverse, middle, center
 ---
 # Types of uncertainty: aleatoric vs. epistemic&lt;sup&gt;1&lt;/sup&gt;
 
-- 
+- aleatoric: 
+
+  - variation due to measurement process, irreducible
+  
+  - "known unknowns"
+  
+- epistemic:
+
+  - insufficiency in the model; reducible by getting more data
+  
+  - "unknown unknowns"
+
 
 .footnote[
 [1]
 Hora, S. (1996) Aleatory and epistemic uncertainty in probability elicitation with an example from hazardous waste management.
 ]
 
+
+---
+# Yet more terminology? How does this matter?
+
+&lt;br /&gt;
+
+- Circle in what you don't know ...
+
+  - get more data
+  - try other models / model families
+  - try getting more context
+  
+  
+- Deal with unavoidable risk (safety margins)
+
+  - include complementary methods
+  - keep in mind in subsequent decision-making 
+
+---
+# Assessing both types of uncertainty, the Gal et al. way
+
+&lt;br /&gt;
+
+- __Aleatoric__: Have network output not just predictive mean, but also _predictive variance_
+
+- Learning different variances for different data points!
+
+- __Epistemic__: Use Monte Carlo sampling to calculate variance of predictions (that are inherently probabilistic due to use of dropout at test time) 
+
+- Making use of learned dropout rate
+
+
+
 ---
 class: inverse, middle, center
 
-# Or just directly: Bayesian networks!
+## This is nice, but computationally intensive, and, well, _indirect_ ...
+
+
+---
+class: inverse, middle, center
+
+# Enter the direct way: Bayesian networks!
 
 ---
 
@@ -312,7 +368,9 @@ class: inverse, middle, center
 
 
 ---
-# Many great predecessors...
+# The idea itself is all but new...
+
+&lt;br /&gt;
 
 - McKay (1992): A practical Bayesian framework for backprop networks
 
@@ -321,18 +379,16 @@ class: inverse, middle, center
 - R. Neal (1996): Bayesian learning for neural networks
 
 
----
-# But gained more momentum rather recently...
+## ... but gained momentum rather recently:
 
 - Graves (2011): Practical Variational Inference for Neural Networks
 
 - Kingma et al. (2015): Variational dropout and the local reparameterization trick
 
-- Blundell et al. (2015): Weight uncertainty in neural networks (a.k.a "Bayes by backprop")
-
+- Blundell et al. (2015): Weight uncertainty in neural networks 
 
 ---
-# Yeah, but how?
+# So how can we do this?
 
 &lt;br /&gt;
 
@@ -344,7 +400,7 @@ class: inverse, middle, center
 
 
 ```r
-devtools::install_github("rstudio/tfprobability")
+install.packages("tfprobability")
 
 library(tfprobability)
 install_tfprobability()
@@ -425,19 +481,24 @@ model %&gt;% fit(
 )
 ```
 
----
-# More distribution layers
-
-&lt;figure&gt;
-    &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/distribution_layers.png" width = "100%"&gt;
-    &lt;figcaption&gt;Complete list: &lt;a href="https://rstudio.github.io/tfprobability/reference/index.html#section-keras-layers-distribution-layers"&gt;Distribution layers&lt;/a&gt;&lt;/figcaption&gt;
-&lt;/figure&gt;
 
 ---
-# Outputting a distribution: Aleatoric uncertainty
+# Back to uncertainty...
+
+&lt;br /&gt;
+
+- If our network can output a distribution, we can have it learn the distribution's parameters
+
+- Choosing e.g. a normal distribution, we can train the network to learn the actual _spread_ in the data
+
+- Thus, we have found a way to estimate _aleatoric_ uncertainty
 
 
-Instead of a single unit (of a _dense_ layer), we output a __normal distribution__:
+
+---
+# Example: Aleatoric uncertainty 
+
+
 
 
 ```r
@@ -451,15 +512,17 @@ model &lt;- keras_model_sequential() %&gt;%
   )
 
 negloglik &lt;- function(y, model) - (model %&gt;% tfd_log_prob(y))
+
 model %&gt;% compile(
   optimizer = optimizer_adam(lr = 0.01),
   loss = negloglik
 )
+
 model %&gt;% fit(x, y, epochs = 1000)
 ```
 
 ---
-# Aleatoric uncertainty ~ learned spread in the data
+# The network has learned about variance in the data
 
 
 ```r
@@ -472,8 +535,37 @@ sd &lt;- yhat %&gt;% tfd_stddev()
     &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/aleatoric.png" width = "80%"&gt;
 &lt;/figure&gt;
 
+
 ---
-# Placing a distribution over the weights: Epistemic uncertainty
+# How about epistemic uncertainty?
+
+Use _tfprobability_ variational layers:
+
+
+- layer_dense_variational
+
+- layer_dense_flipout
+
+- layer_dense_reparameterization
+
+- layer_dense_local_reparameterization
+
+- layer_conv_nd_flipout (n = [1..3])
+
+- layer_conv_nd_flipout (n = [1..3])
+
+- layer_conv_nd_flipout (n = [1..3])
+
+---
+# Posterior weights are computed using variational inference
+
+&lt;figure&gt;
+    &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/blei_vi.png" width = "80%"&gt;
+    &lt;figcaption&gt;Source: &lt;a href="https://media.nips.cc/Conferences/2016/Slides/6199-Slides.pdf"&gt;David Blei, Rajesh Ranganath, Shakir Mohamed: Variational Inference:Foundations and Modern Methods. NIPS 2016 Tutorial·December 5, 2016.&lt;/a&gt;&lt;/figcaption&gt;
+&lt;/figure&gt;
+
+---
+# Example: Epistemic uncertainty
 
 
 ```r
@@ -489,17 +581,17 @@ model &lt;- keras_model_sequential() %&gt;%
     )
 
 negloglik &lt;- function(y, model) - (model %&gt;% tfd_log_prob(y))
+
 model %&gt;% compile(
   optimizer = optimizer_adam(lr = 0.1),
   loss = negloglik
 )
+
 model %&gt;% fit(x, y, epochs = 1000)
 ```
 
 ---
-# Epistemic uncertainty ~ model uncertainty
-
-Every prediction uses a different _sample from the weight distributions_!
+# Now every prediction uses different _weight samples_
 
 
 ```r
@@ -510,16 +602,10 @@ yhats &lt;- purrr::map(1:100, function(x) model(tf$constant(x_test)))
     &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/epistemic.png" width = "80%"&gt;
 &lt;/figure&gt;
 
----
-# Posterior weights are computed using variational inference
 
-&lt;figure&gt;
-    &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/blei_vi.png" width = "80%"&gt;
-    &lt;figcaption&gt;Source: &lt;a href="https://media.nips.cc/Conferences/2016/Slides/6199-Slides.pdf"&gt;David Blei, Rajesh Ranganath, Shakir Mohamed: Variational Inference:Foundations and Modern Methods. NIPS 2016 Tutorial·December 5, 2016.&lt;/a&gt;&lt;/figcaption&gt;
-&lt;/figure&gt;
 
 ---
-# Epistemic and aleatoric uncertainty in one model
+# Aleatoric, epistemic ... why not have both? 
 
 
 ```r
@@ -558,38 +644,7 @@ class: inverse, middle, center
 
 
 
-# Other ways of modeling uncertainty with TFP
-
-
----
-# Variational autoencoders: Informative latent codes
-
-&lt;figure&gt;
-    &lt;img src="https://raw.githubusercontent.com/skeydan/whyR2019/master/vae.png" width = "80%"&gt;
-    &lt;figcaption&gt;Source: https://lilianweng.github.io/lil-log/2018/08/12/from-autoencoder-to-beta-vae.html&lt;/figcaption&gt;
-&lt;/figure&gt;
-
-
----
-# Variational autoencoders with tfprobability
-
-
-```r
-encoder_model &lt;- keras_model_sequential() %&gt;%
-  [...] %&gt;%
-  layer_multivariate_normal_tri_l(event_size = encoded_size) %&gt;%
-  # pass in the prior of your choice ...
-  # can use exact KL divergence or Monte Carlo approximation
-  layer_kl_divergence_add_loss([...])
-
-decoder_model &lt;- keras_model_sequential() %&gt;%
-  [...] %&gt;%
- layer_independent_bernoulli([...])
-
-vae_model &lt;- keras_model(inputs = encoder_model$inputs,
-                         outputs = decoder_model(encoder_model$outputs[1]))
-vae_loss &lt;- function (x, rv_x) - (rv_x %&gt;% tfd_log_prob(x))
-```
+# Case study: Smartphone activity detection
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
