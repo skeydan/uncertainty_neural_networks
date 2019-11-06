@@ -82,7 +82,7 @@ Let's ask the network ...
     <img src="dlwr.jpg" style = "float:left;" width= "35%">
 </figure>
 <figure>
-    <img src="r-tf.png" style = "float:right;" width= "45%">
+    <img src="https://raw.githubusercontent.com/skeydan/uncertainty_neural_networks/master/r-tf.png" style = "float:right;" width= "45%">
 </figure>
 
 
@@ -632,14 +632,14 @@ Nick Strayer, Classifying physical activity from smartphone data [https://blogs.
 <br >
 
 <figure>
-    <img src="measurements.png" width = "110%">
+    <img src="https://raw.githubusercontent.com/skeydan/uncertainty_neural_networks/master/measurements.png" width = "110%">
 </figure>
 
 ---
 # Original confusion matrix
 
 <figure>
-    <img src="confusion_matrix.png" width = "80%">
+    <img src="https://raw.githubusercontent.com/skeydan/uncertainty_neural_networks/master/confusion_matrix.png" width = "80%">
 </figure>
 
 
@@ -686,7 +686,7 @@ nll <- function(y, model) - (model %>% tfd_log_prob(y))
 # Loss curve
 
 <figure>
-    <img src="losscurve.png" width = "110%">
+    <img src="https://raw.githubusercontent.com/skeydan/uncertainty_neural_networks/master/losscurve.png" width = "110%">
 </figure>
 
 
