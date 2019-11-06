@@ -261,15 +261,15 @@ class: inverse, middle, center
 
 - idea: use at test time and average predictions
 
-- mathematically derived to be ["equivalent to Monte Carlo integration over a Gaussian process posterior approximation"](http://mlg.eng.cam.ac.uk/yarin/blog_3d801aa532c1ce.html)
-
-.footnote[
-
-[1] Gal and Ghahramani (2016): Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning
-
-]
+&lt;br /&gt;
 
 ## Question: How to choose the dropout rate?
+
+
+.footnote[
+[1] Gal and Ghahramani (2016): Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning
+]
+
 
 
 
@@ -373,18 +373,15 @@ class: inverse, middle, center
 &lt;br /&gt;
 
 - McKay (1992): A practical Bayesian framework for backprop networks
-
 - Hinton and van Camp (1993): Keeping neural networks simple by minimizing the description length of the weights
-
 - R. Neal (1996): Bayesian learning for neural networks
 
+&lt;br /&gt;
 
 ## ... but gained momentum rather recently:
 
 - Graves (2011): Practical Variational Inference for Neural Networks
-
 - Kingma et al. (2015): Variational dropout and the local reparameterization trick
-
 - Blundell et al. (2015): Weight uncertainty in neural networks 
 
 ---
@@ -641,10 +638,137 @@ More background: https://blogs.rstudio.com/tensorflow/posts/2019-06-05-uncertain
 ---
 class: inverse, middle, center
 
-
-
-
 # Case study: Smartphone activity detection
+
+---
+# Non-probabilistic cassification
+
+Nick Strayer, Classifying physical activity from smartphone data [https://blogs.rstudio.com/tensorflow/posts/2018-07-17-activity-detection/](https://blogs.rstudio.com/tensorflow/posts/2018-07-17-activity-detection/) 
+
+&lt;br &gt;
+
+&lt;figure&gt;
+    &lt;img src="measurements.png" width = "110%"&gt;
+&lt;/figure&gt;
+
+---
+# Original confusion matrix
+
+&lt;figure&gt;
+    &lt;img src="confusion_matrix.png" width = "80%"&gt;
+&lt;/figure&gt;
+
+
+---
+# Goal: Port model to TensorFlow Probability
+
+&lt;br /&gt;
+
+- replace normal conv layers by _layer_conv_1d_flipout_
+
+- replace deterministic output layer by _layer_one_hot_categorical_
+
+- training objective: ELBO: minimize:
+  
+   - KL divergence between a (standard) multivariate normal prior and the approximate posterior
+   - negative log probability of the data under the approximate posterior
+
+
+---
+# Probabilistic model
+
+
+```r
+model &lt;- keras_model_sequential()
+
+model %&gt;% 
+  layer_conv_1d_flipout(
+    filters = 12,
+    kernel_size = 3, 
+    activation = "relu",
+    kernel_divergence_fn = kl_div
+  ) %&gt;%
+  #...
+  #...
+  layer_dense_flipout(
+    num_classes, 
+    kernel_divergence_fn = kl_div,
+  ) %&gt;%
+  layer_one_hot_categorical(event_size = num_classes)
+
+nll &lt;- function(y, model) - (model %&gt;% tfd_log_prob(y))
+```
+
+---
+# Loss curve
+
+&lt;figure&gt;
+    &lt;img src="losscurve.png" width = "110%"&gt;
+&lt;/figure&gt;
+
+
+---
+# Uncertainties
+
+- __maxprob__: single-run highest per-obs mean of categorical distribution
+- __maxprob_sd__: standard deviation associated with single-run highest per-obs mean of categorical distribution
+- __maxprob_sd_mc__: standard deviation of means obtained from 100 prediction runs (weights are probabilistic!)
+
+```
+     obs maxprob maxprob_sd maxprob_mc_sd     predicted         truth correct
+     
+ 1     1   0.997     0.0561        0.175    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 2     2   0.653     0.476         0.235    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 3     3   0.987     0.112         0.121    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 4     4   0.960     0.195         0.130    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 5     5   0.987     0.115         0.325    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 6     6   0.568     0.495         0.265    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 7     7   0.701     0.458         0.320    STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 8     8   0.982     0.134         0.0651   STAND_TO_SIT   STAND_TO_S…   TRUE   
+ 9     9   0.589     0.492         0.235    STAND_TO_SIT   STAND_TO_S…   TRUE   
+10    10   0.546     0.498         0.114    STAND_TO_SIT   STAND_TO_S…   TRUE   
+11    11   0.798     0.401         0.220    STAND_TO_SIT   STAND_TO_S…   TRUE   
+... 
+```
+
+---
+# Are wrong classifications associated with higher uncertainty?
+
+```
+correct count   avg_mean   avg_sd   avg_mc_sd
+
+FALSE      17      0.673    0.420       0.229
+TRUE       52      0.814    0.314       0.178
+```
+
+```
+truth          predicted    avg_mean   avg_sd avg_mc_sd   correct
+
+SIT_TO_LIE     SIT_TO_LIE      0.904    0.240     0.136   TRUE   
+LIE_TO_SIT     LIE_TO_STAND    0.532    0.498     0.153   FALSE  
+SIT_TO_STAND   SIT_TO_STAND    0.904    0.238     0.165   TRUE   
+STAND_TO_LIE   STAND_TO_LIE    0.833    0.297     0.179   TRUE   
+LIE_TO_STAND   LIE_TO_STAND    0.651    0.470     0.191   TRUE   
+STAND_TO_SIT   STAND_TO_SIT    0.814    0.290     0.194   TRUE   
+LIE_TO_SIT     LIE_TO_SIT      0.682    0.448     0.196   TRUE   
+LIE_TO_STAND   LIE_TO_SIT      0.639    0.454     0.213   FALSE  
+SIT_TO_LIE     STAND_TO_SIT    0.692    0.462     0.240   FALSE  
+SIT_TO_LIE     STAND_TO_LIE    0.738    0.379     0.265   FALSE  
+STAND_TO_LIE   SIT_TO_LIE      0.813    0.282     0.299   FALSE
+```
+
+---
+# Where to from here?
+
+&lt;br /&gt;
+
+- TensorFlow Probability is under rapid development
+
+- Follow the TensorFlow for R blog for updates: https://blogs.rstudio.com/tensorflow/
+
+&lt;br /&gt;
+
+## Thanks for your attention!
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
