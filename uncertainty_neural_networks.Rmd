@@ -79,7 +79,7 @@ Let's ask the network ...
 ... TensorFlow, but from R!
 
 <figure>
-    <img src="dlwr.jpg" style = "float:left;" width= "35%">
+    <img src="https://raw.githubusercontent.com/skeydan/uncertainty_neural_networks/master/dlwr.jpg" style = "float:left;" width= "35%">
 </figure>
 <figure>
     <img src="https://raw.githubusercontent.com/skeydan/uncertainty_neural_networks/master/r-tf.png" style = "float:right;" width= "45%">
